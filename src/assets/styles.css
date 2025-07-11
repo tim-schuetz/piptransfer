@@ -1,0 +1,15 @@
+.elcardalternative{
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    background-color: #fff;
+    padding: 20px;
+    border: 1px solid #ebeef5;
+}
+.iconhover{
+    cursor: pointer;
+}
+.iconhover:hover{
+    color: rgb(0, 157, 255);
+    transition: color 0.3s ease;
+}
+
