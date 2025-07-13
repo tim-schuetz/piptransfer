@@ -5,86 +5,11 @@ import pandas as pd
 from sqlalchemy import desc
 import statistics
 from ..leadtimedatasource import updatekanbandatabase, extractmonthasnumberfromdate
+from sqlalchemy import func, cast, Float
 
 leadtime_bp = Blueprint('leadtime', __name__)
 
-@leadtime_bp.route('/getkanbandata', methods=['POST'])
-def getkanbandata():
-
-    uniquedates = [r[0] for r in db.session.query(Leadtimetable.created).distinct()]
-    uniquedates_monthasint = [int(date[6:7]) if not str(date[6:7]).startswith("0") else int(date[7]) for date in uniquedates]
-    uniquemonths_asint = list(set(uniquedates_monthasint))
-    months = {
-        1: 'January',
-        2: 'February',
-        3: 'March',
-        4: 'April',
-        5: 'May',
-        6: 'June',
-        7: 'July',
-        8: 'August',
-        9: 'September',
-        10: 'October',
-        11: 'November',
-        12: 'December'
-    }
-    uniquemonths_asstring = [months[monthint] for monthint in uniquemonths_asint]
-
-    monthselectoptions = {'monthsasnumber': uniquemonths_asint, 'monthsasword': uniquemonths_asstring}
-
-    uniquematerialslist = [r[0] for r in db.session.query(Leadtimetable.material).distinct()]
-
-    uniqueloopslist = [r[0] for r in db.session.query(Leadtimetable.cntcycle).distinct()]
-
-
-    data = request.get_json()
-    material = data.get('material')
-    loop = data.get('loop')
-    sortfor = data.get('sortfor')
-
-    print('material:', material, 'loop:', loop, 'sortfor:', sortfor)
-
-    query = (
-        db.session.query(
-            Leadtimetable
-        )
-        .filter(
-            Leadtimetable.kanbanstatus == 2,
-        ) # Entweder nur Status 2 oder nur Status 5 damit nicht doppelt (am besten nur Status 2, damit die noch offenen sichtbar)
-    )
-
-    if material and material.lower() != 'all':
-        query = query.filter(Leadtimetable.material == material)
-
-    if loop and loop.lower() != 'all':
-        query = query.filter(Leadtimetable.cntcycle == loop)
-
-    if sortfor and sortfor == 'leadtime':
-        query = query.order_by(desc(Leadtimetable.leadtimeinh))
-    elif sortfor and sortfor == 'kanbanID':
-        query = query.order_by(desc(Leadtimetable.kanbanidnumber))
-    else:
-        query =query.order_by(desc(Leadtimetable.created))
-
-    results = query.all()
-
-    kanbaninfos = [{'material': result.material, 'idnumber': result.id, 'creationdate': result.created, 'creationtime': result.time, 'status': result.kanbanstatus, 'ordernumber': result.order, 'cntcycle': result.cntcycle, 'leadtimeinh': result.leadtimeinh, 'activationstatus': result.activationstatus, 'month': extractmonthasnumberfromdate(result.created), 'hourssincemonthbeginning': result.hourssincemonthbeginning} for result in results]
-
-    leadtimeinfos = [float(result.leadtimeinh) for result in results]
-
-    avgleadtime = statistics.mean(leadtimeinfos) if len(leadtimeinfos) > 0 else None
-    minleadtime = min(leadtimeinfos) if len(leadtimeinfos) > 0 else None
-    maxleadtime = max(leadtimeinfos) if len(leadtimeinfos) > 0 else None
-
-    totalvalues = len(kanbaninfos)
-
-    return jsonify({'kanbaninfos':kanbaninfos, 'uniquematerialslist': uniquematerialslist, 'uniqueloopslist': uniqueloopslist, 'monthselectoptions':monthselectoptions, 'avgleadtime': avgleadtime, 'minleadtime': minleadtime, 'maxleadtime': maxleadtime, 'totalvalues': totalvalues})
-
-
-@leadtime_bp.route('/updatekanbandatabase')
-def redirect_updatekanbandatabase():
-    updatekanbandatabase()
-    return jsonify({'updated': 'successful'}), 200
+#Testing:
 
 @leadtime_bp.route('/exposekanbandatabase')
 def exposekanbandatabase():
@@ -95,4 +20,104 @@ def exposekanbandatabase():
     responselength = len(response)
 
     return jsonify({'responselength': responselength, 'response': response})
+
+#Production:
+
+@leadtime_bp.route('/getkanbanfilteroptions')
+def getfilteroptions():
+    uniquematerialslist = [r[0] for r in db.session.query(Leadtimetable.material).distinct()]
+    uniqueloopslist = [r[0] for r in db.session.query(Leadtimetable.cntcycle).distinct()]
+    uniquemonths_as_int = [r[0] for r in db.session.query(Leadtimetable.creationmonthasint).distinct()]
+    return jsonify({'uniquematerialslist': uniquematerialslist, 'uniqueloopslist': uniqueloopslist, 'uniquemonths_as_int': uniquemonths_as_int})
+
+@leadtime_bp.route('/updatekanbandatabase')
+def redirect_updatekanbandatabase():
+    updatekanbandatabase()
+    return jsonify({'updated': 'successful'}), 200
+
+@leadtime_bp.route('/getkpivalues', methods=['POST'])
+def getkpivalues():
+    data = request.get_json()
+    materials = data.get('material')
+    loop = data.get('loop')
+    monthasint = data.get('monthasint')
+
+    query = db.session.query(
+        func.min(Leadtimetable.leadtimeinh).label('leadtime_min'),
+        func.max(Leadtimetable.leadtimeinh).label('leadtime_max'),
+        func.avg(Leadtimetable.leadtimeinh).label('leadtime_avg')
+    )
+
+    if materials and len(materials) > 0:
+        query = query.filter(Leadtimetable.material.in_(materials))
+
+    if loop and loop != 'all':
+        query = query.filter(Leadtimetable.cntcycle == loop)
+
+    if monthasint and monthasint != 'all':
+        query = query.filter(Leadtimetable.creationmonthasint == int(monthasint))
+
+    # results = query.all()
+    # result = results[0]
+
+    result = query.one()
+
+    return jsonify({
+        'minleadtime': result.leadtime_min,
+        'maxleadtime': result.leadtime_max,
+        'avgleadtime': round(result.leadtime_avg, 2) if result.leadtime_avg is not None else None
+    })
+
+@leadtime_bp.route('/getleadtimebymatnrs', methods=['POST'])
+def leadtimebymatnrs():
+
+    #Am Ende noch nach der Dauer der Durchlaufzeit absteigend sortieren
+
+    data = request.get_json()
+    materials = data.get('materials')
+    loop = data.get('loop')
+    monthasint = data.get('monthasint')
+    xaxisparameter = data.get('xaxisparameter')
+
+    print("loop:", loop, "monthasint:", monthasint, "materials:", materials, "xaxisparameter:", xaxisparameter)
+
+    query = db.session.query(
+        Leadtimetable.material,
+        Leadtimetable.kanbanidnumber,
+        Leadtimetable.order,
+        func.avg(cast(Leadtimetable.leadtimeinh, Float)).label('average_leadtime')
+    )
+
+    if materials and len(materials) > 0:
+        query = query.filter(Leadtimetable.material.in_(materials))
+
+    if loop and loop != 'all':
+        query = query.filter(Leadtimetable.cntcycle == loop)
+
+    if monthasint and monthasint != 'all':
+        query = query.filter(Leadtimetable.creationmonthasint == int(monthasint))
+
+    if xaxisparameter == 'material':
+        query = query.group_by(Leadtimetable.material)
+    elif xaxisparameter == 'kanbanid':
+        query = query.group_by(Leadtimetable.kanbanidnumber)
+    else:
+        query = query.group_by(Leadtimetable.order)
+
+    results = query.all()
+
+    xaxisvalues = [r.material for r in results]
+    leadtimes = [round(r.average_leadtime, 2) if r.average_leadtime is not None else None for r in results]
+
+    for i in range(len(leadtimes) - 1, -1, -1):
+        if leadtimes[i] is None:
+            leadtimes.pop(i)
+            xaxisvalues.pop(i)
+
+    print ("xaxisvalues:", xaxisvalues, 'leadtimes:', leadtimes)
+
+    return jsonify({
+        'materials': xaxisvalues,
+        'leadtimes': leadtimes
+    })
 

@@ -49,15 +49,6 @@ const initChart = () =>{
 
     const rawData = scrapissueorigins.value
 
-    // const rawData = [                           //statt den Raw Data hier die Daten aus der API reinholen
-    //     { amount: "11901", issue: "阀芯尺寸", material: "NG10 Spool" },
-    //     { amount: "1954",  issue: "阀芯表面", material: "NG10 Spool" },
-    //     { amount: "106",   issue: " 零件损坏", material: "NG6 Spool" },
-    //     { amount: "21864", issue: "阀芯尺寸", material: "NG6 Spool" },
-    //     { amount: "7124",  issue: "阀芯表面", material: "NG6 Spool" }
-    // ];
-
-    // 1. Materialnamen extrahieren (X-Achse)
     const materials = [...new Set(rawData.map(item => item.material))];
 
     const displaymaterials = []

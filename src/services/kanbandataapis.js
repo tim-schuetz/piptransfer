@@ -1,29 +1,5 @@
 import { environmentsettingsstore } from "@/stores/environmentsettingsstore"
-
-// export async function fetchkanbaninfo(material, loop, sortfor){
-
-//     const environmentsettingsoptions = environmentsettingsstore()
-
-//     try{
-//         const response = await fetch(environmentsettingsoptions.apimainpath + '/getkanbandata', {
-//             method: 'POST',
-//             headers: {
-//                 "Content-Type": "application/json"
-//             },
-//             body: JSON.stringify({
-//                 material: material,
-//                 loop: loop,
-//                 sortfor: sortfor
-//             }) 
-//         })
-
-//         const data = await response.json()
-
-//         return [data.kanbaninfos, data.uniquematerialslist, data.uniqueloopslist, data.monthselectoptions, data.avgleadtime, data.minleadtime, data.maxleadtime, data.totalvalues]
-//     } catch(error){
-//         console.error(error)
-//     }
-// }
+import { kanbanfilterinfostore } from "@/stores/kanbanfilterinformationstore"
 
 export async function getkanbanfilteroptions(){
 
@@ -41,11 +17,10 @@ export async function getkanbanfilteroptions(){
 
     } catch(error) {
         console.error(error)
+        return { uniquematerialslist: [], uniqueloopslist: [], uniquemonths_as_int: []}
     }
 
 }
-
-
 
 export async function updatekanbandatabase(){
 
@@ -59,4 +34,67 @@ export async function updatekanbandatabase(){
     } catch(error){
         console.error(error)
     }
+}
+
+export async function getkpivalues(){
+
+    const environmentsettingsoptions = environmentsettingsstore()
+    const kanbanfilterinfooptions = kanbanfilterinfostore()
+
+    try{
+        const response = await fetch(environmentsettingsoptions.apimainpath + '/getkpivalues',{
+            method: 'POST',
+            headers: {'Content-type': 'application/json'},
+            body: JSON.stringify({
+                materials: kanbanfilterinfooptions.getmaterials,
+                loop: kanbanfilterinfooptions.getselectedloop,
+                monthasint: kanbanfilterinfooptions.getselectedmonth,
+            })
+        })
+        const data = await response.json();
+        const { minleadtime, maxleadtime, avgleadtime } = data
+        return { minleadtime, maxleadtime, avgleadtime }
+    } catch(error){
+        console.error(error)
+        return { minleadtime: [], maxleadtime: [], avgleadtime: [] }
+    }
+}
+
+export async function getleadtimebymatnrs(){
+
+    const environmentsettingsoptions = environmentsettingsstore()
+    const kanbanfilterinfooptions = kanbanfilterinfostore()
+
+    console.log("kanbanfilterinfooptions.getmaterials():", kanbanfilterinfooptions.getmaterials())
+    console.log("kanbanfilterinfooptions.getselectedloop():", kanbanfilterinfooptions.getselectedloop())
+    console.log("kanbanfilterinfooptions.getselectedmonth():", kanbanfilterinfooptions.getselectedmonth())
+    console.log("kanbanfilterinfooptions.getxaxisparameter():", kanbanfilterinfooptions.getxaxisparameter())
+
+    try{
+        const response = await fetch(environmentsettingsoptions.apimainpath + '/getleadtimebymatnrs',{
+            method: 'POST',
+            headers: { 'Content-type': 'application/json'},
+            body: JSON.stringify({
+                materials: kanbanfilterinfooptions.getmaterials(),
+                loop: kanbanfilterinfooptions.getselectedloop(),
+                monthasint: kanbanfilterinfooptions.getselectedmonth(),
+                xaxisparameter: kanbanfilterinfooptions.getxaxisparameter()
+            })
+        })
+        const data = await response.json()
+        const { materials, leadtimes } = data;
+        return { materials, leadtimes }
+        //nach dem Import: const { materials, leadtimes } = await getleadtimebymatnrs();
+    } catch(error){
+        console.error(error)
+        return { materials: [], leadtimes: [] }
+    }
+}
+
+export async function getleadtimebyordernumber(){
+    
+}
+
+export async function getrawdatafromdatabase(){
+
 }

@@ -13,6 +13,7 @@ class Leadtimetable(db.Model):
     cntcycle = db.Column(db.String)
     leadtimeinh = db.Column(db.String)
     activationstatus = db.Column(db.String)
-    hourssincemonthbeginning = db.Column(db.Integer)
+
+    # hourssincemonthbeginning = db.Column(db.Integer)
 
 
